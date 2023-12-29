@@ -1,8 +1,8 @@
 {
   "name": "@pendulum-chain/api-solang",
-  "version": "0.0.7",
+  "version": "0.1.0",
   "description": "Interface to interact with smart contracts compiled via Solang",
-  "main": "build/index.js",
+  "main": "build/esm/index.js",
   "devDependencies": {
     "@types/node": "^20.6.0",
     "rimraf": "^5.0.1",
@@ -17,16 +17,17 @@
     "@polkadot/util": "^12.3.2",
     "@polkadot/util-crypto": "^12.3.2"
   },
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
-    "build": "npm run clean && tsc",
     "clean": "rimraf build",
     "prepublishOnly": "npm run build",
-    "simplyPublish": "npm publish --workspace @pendulum-chain/api-solang --access public"
+    "simplyPublish": "npm publish --workspace @pendulum-chain/api-solang --access public",
+    "compile": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
+    "build": "npm run clean && npm run compile"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pendulum-chain/wasm-deploy.git"
+    "url": "git+https://github.com/pendulum-chain/api-solang.git"
   },
   "keywords": [
     "Solang",
@@ -39,7 +40,21 @@
   "author": "Pendulum",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/pendulum-chain/wasm-deploy/issues"
+    "url": "https://github.com/pendulum-chain/api-solang/issues"
   },
-  "homepage": "https://github.com/pendulum-chain/wasm-deploy#readme"
+  "homepage": "https://github.com/pendulum-chain/api-solang#readme",
+  "exports": {
+    ".": {
+      "types": "./build/types/index.d.ts",
+      "require": "./build/cjs/index.js",
+      "import": "./build/esm/index.js",
+      "default": "./build/esm/index.js"
+    },
+    "./*": {
+      "types": "./build/types/*.d.ts",
+      "require": "./build/cjs/*.js",
+      "import": "./build/esm/*.js",
+      "default": "./build/esm/*.js"
+    }
+  }
 }
