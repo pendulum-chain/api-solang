@@ -76,6 +76,7 @@ export interface MessageCallOptions {
   limits: Limits;
   modifyExtrinsic?: (extrinsic: Extrinsic) => Extrinsic;
   lookupAbi?: (contractAddress: Address) => Abi | undefined;
+  gasLimitTolerancePercentage?: number;
 }
 
 export type MessageCallResult = {
@@ -172,10 +173,11 @@ export async function messageCall({
   getSigner,
   modifyExtrinsic,
   lookupAbi,
+  gasLimitTolerancePercentage = 10,
 }: MessageCallOptions): Promise<MessageCallResult> {
   const contract = new ContractPromise(api, abi, contractDeploymentAddress);
 
-  const { gasRequired, output } = await rpcCall({
+  let { gasRequired, output } = await rpcCall({
     api,
     abi,
     contractAddress: contractDeploymentAddress,
@@ -202,7 +204,12 @@ export async function messageCall({
     return { execution: { type: "onlyQuery" }, result: output };
   }
 
-  const signer = await getSigner();
+  if (gasLimitTolerancePercentage > 0) {
+    gasRequired = api.createType("WeightV2", {
+      refTime: (gasRequired.refTime.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
+      proofSize: (gasRequired.proofSize.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
+    });
+  }
 
   const typesAddress = api.registry.createType("AccountId", contractDeploymentAddress);
   let extrinsic = api.tx.contracts.call(
@@ -216,6 +223,8 @@ export async function messageCall({
   if (modifyExtrinsic) {
     extrinsic = modifyExtrinsic(extrinsic);
   }
+
+  const signer = await getSigner();
   const { events, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
 
   return {
