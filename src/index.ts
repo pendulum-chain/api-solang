@@ -1,7 +1,7 @@
 import { ApiPromise } from "@polkadot/api";
 import { BN_ZERO } from "@polkadot/util";
 import { ContractPromise } from "@polkadot/api-contract";
-import { Event } from "@polkadot/types/interfaces";
+import { EventRecord } from "@polkadot/types/interfaces";
 import { AnyJson } from "@polkadot/types-codec/types";
 import { Abi } from "@polkadot/api-contract";
 
@@ -91,13 +91,13 @@ export type MessageCallResult = {
 };
 
 function decodeContractEvents(
-  events: Event[],
+  eventRecords: EventRecord[],
   lookupAbi?: (contractAddress: Address) => Abi | undefined
 ): ContractEvent[] {
-  return events
-    .filter(({ section, method }) => section === "contracts" && method === "ContractEmitted")
-    .map(({ data }): ContractEvent => {
-      const dataJson = data.toHuman() as { contract: string; data: string };
+  return eventRecords
+    .filter(({ event: { section, method } }) => section === "contracts" && method === "ContractEmitted")
+    .map((eventRecord): ContractEvent => {
+      const dataJson = eventRecord.event.data.toHuman() as { contract: string; data: string };
       const emittingContractAddress = dataJson.contract;
       const buffer = Buffer.from(dataJson.data.slice(2), "hex");
 
@@ -108,7 +108,7 @@ function decodeContractEvents(
           data: buffer,
         };
       }
-      const decodedEvent = abi.decodeEvent(buffer);
+      const decodedEvent = abi.decodeEvent(eventRecord);
 
       return {
         emittingContractAddress,
@@ -159,7 +159,7 @@ export async function deployContract({
     return lookupAbi?.(contractAddress);
   };
 
-  return { ...result, events: decodeContractEvents(result.events, extendedLookupAbi) };
+  return { ...result, events: decodeContractEvents(result.eventRecords, extendedLookupAbi) };
 }
 
 export async function messageCall({
@@ -225,10 +225,10 @@ export async function messageCall({
   }
 
   const signer = await getSigner();
-  const { events, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
+  const { eventRecords, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
 
   return {
-    execution: { type: "extrinsic", contractEvents: decodeContractEvents(events, lookupAbi), transactionFee },
+    execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
     result: status.type === "success" ? { type: "success", value: output.value } : status,
   };
 }

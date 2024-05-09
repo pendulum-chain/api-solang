@@ -1,4 +1,4 @@
-import { Event, AccountId32, DispatchError, DispatchInfo } from "@polkadot/types/interfaces";
+import { AccountId32, DispatchError, DispatchInfo, EventRecord } from "@polkadot/types/interfaces";
 import { AddressOrPair, SignerOptions, SubmittableExtrinsic } from "@polkadot/api/types";
 import { ISubmittableResult, Signer } from "@polkadot/types/types";
 import { INumber, ITuple } from "@polkadot/types-codec/types";
@@ -13,7 +13,7 @@ export type SubmitExtrinsicStatus = { type: "success" } | { type: "error"; error
 
 export interface SubmitExtrinsicResult {
   transactionFee: bigint | undefined;
-  events: Event[];
+  eventRecords: EventRecord[];
   status: SubmitExtrinsicStatus;
 }
 
@@ -62,13 +62,12 @@ export async function submitExtrinsic(
       const unsub = await extrinsic.signAndSend(account, signerOptions, (update) => {
         const { status, events: eventRecords } = update;
 
-        const events = eventRecords.map(({ event }) => event);
         if (status.isInBlock || status.isFinalized) {
           let transactionFee: bigint | undefined = undefined;
           let status: SubmitExtrinsicStatus | undefined = undefined;
 
-          for (const event of events) {
-            const { data, section, method } = event;
+          for (const eventRecord of eventRecords) {
+            const { data, section, method } = eventRecord.event;
 
             if (section === "transactionPayment" && method === "TransactionFeePaid") {
               const [, actualFee] = data as unknown as ITuple<[AccountId32, INumber, INumber]>;
@@ -87,7 +86,7 @@ export async function submitExtrinsic(
 
           if (status !== undefined) {
             unsub();
-            resolve({ transactionFee, events, status });
+            resolve({ transactionFee, eventRecords, status });
           }
         }
       });
