@@ -1,6 +1,6 @@
 import { ApiPromise } from "@polkadot/api";
 import { CodePromise, Abi } from "@polkadot/api-contract";
-import { AccountId, Event } from "@polkadot/types/interfaces";
+import { AccountId, EventRecord } from "@polkadot/types/interfaces";
 import { ITuple } from "@polkadot/types-codec/types";
 
 import { Limits, Address } from "./index.js";
@@ -18,7 +18,7 @@ export interface BasicDeployContractOptions {
 }
 
 export type BasicDeployContractResult =
-  | { type: "success"; events: Event[]; deploymentAddress: Address; transactionFee: bigint | undefined }
+  | { type: "success"; eventRecords: EventRecord[]; deploymentAddress: Address; transactionFee: bigint | undefined }
   | { type: "error"; error: string }
   | { type: "reverted"; description: string }
   | { type: "panic"; errorCode: PanicCode; explanation: string };
@@ -66,7 +66,7 @@ export async function basicDeployContract({
   if (modifyExtrinsic) {
     extrinsic = modifyExtrinsic(extrinsic);
   }
-  const { events, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
+  const { eventRecords, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
 
   if (status.type === "error") {
     return { type: "error", error: `Contract could not be deployed: ${status.error}` };
@@ -74,8 +74,8 @@ export async function basicDeployContract({
 
   let deploymentAddress: Address | undefined = undefined;
 
-  for (const event of events) {
-    const { data, section, method } = event;
+  for (const eventRecord of eventRecords) {
+    const { data, section, method } = eventRecord.event;
 
     if (section === "contracts" && method === "Instantiated") {
       const [, contract] = data as unknown as ITuple<[AccountId, AccountId]>;
@@ -87,5 +87,5 @@ export async function basicDeployContract({
     return { type: "error", error: "Contract address not found" };
   }
 
-  return { type: "success", deploymentAddress, events, transactionFee };
+  return { type: "success", deploymentAddress, eventRecords, transactionFee };
 }
