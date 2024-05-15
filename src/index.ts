@@ -44,7 +44,7 @@ export interface DecodedContractEvent {
 
 export interface ContractEvent {
   emittingContractAddress: Address;
-  data: Buffer;
+  data: Uint8Array;
   decoded?: DecodedContractEvent;
 }
 
@@ -116,20 +116,26 @@ function decodeContractEvents(
     .map((eventRecord): ContractEvent => {
       const dataJson = eventRecord.event.data.toHuman() as { contract: string; data: string };
       const emittingContractAddress = dataJson.contract;
-      const buffer = Buffer.from(dataJson.data.slice(2), "hex");
+
+      let dataHexString = dataJson.data;
+      if (dataHexString.startsWith("0x")) dataHexString = dataHexString.slice(2);
+      const data = new Uint8Array(dataHexString.length / 2);
+      for (let i = 0; i * 2 < dataHexString.length; i += 1) {
+        data[i] = parseInt(dataHexString.slice(i * 2, i * 2 + 2), 16);
+      }
 
       const abi = lookupAbi?.(emittingContractAddress);
       if (abi === undefined) {
         return {
           emittingContractAddress,
-          data: buffer,
+          data,
         };
       }
       const decodedEvent = abi.decodeEvent(eventRecord);
 
       return {
         emittingContractAddress,
-        data: buffer,
+        data,
         decoded: {
           args: decodedEvent.event.args.map((arg, index) => ({
             name: arg.name,
