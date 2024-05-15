@@ -60,6 +60,7 @@ export type QueryContractOutput =
 
 export interface QueryContractResult {
   gasRequired: Weight;
+  gasConsumed: Weight;
   output: QueryContractOutput;
 }
 
@@ -135,12 +136,20 @@ export async function rpcCall({
       }
       resolved = true;
 
-      const { result, gasRequired } = event;
+      const { result, gasRequired, gasConsumed } = event;
 
       if (result.isOk) {
-        resolve({ gasRequired, output: extractContractExecutionOutput(api, abi, result.asOk, message.returnType) });
+        resolve({
+          gasRequired,
+          gasConsumed,
+          output: extractContractExecutionOutput(api, abi, result.asOk, message.returnType),
+        });
       } else {
-        resolve({ gasRequired, output: { type: "error", description: extractDispatchErrorDescription(result.asErr) } });
+        resolve({
+          gasRequired,
+          gasConsumed,
+          output: { type: "error", description: extractDispatchErrorDescription(result.asErr) },
+        });
       }
     });
   });
@@ -188,15 +197,20 @@ export async function rpcInstantiate({
       }
       resolved = true;
 
-      const { result, gasRequired } = event;
+      const { result, gasRequired, gasConsumed } = event;
 
       if (result.isOk) {
         resolve({
           gasRequired,
+          gasConsumed,
           output: extractContractExecutionOutput(api, abi, result.asOk.result, constructor.returnType),
         });
       } else {
-        resolve({ gasRequired, output: { type: "error", description: extractDispatchErrorDescription(result.asErr) } });
+        resolve({
+          gasRequired,
+          gasConsumed,
+          output: { type: "error", description: extractDispatchErrorDescription(result.asErr) },
+        });
       }
     });
   });

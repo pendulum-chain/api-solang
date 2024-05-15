@@ -2,20 +2,29 @@
 
 This library allows to deploy and call into smart contracts that have been compiled from Solidity to wasm via Solang.
 
-It has two main functions:
+It has three main functions:
 
 - deploy (instantiate) a smart contract
-- execute a message call to an existing smart contract
+- execute a message call by submitting an extrinsic
+- make a message call via RPC (dry-run)
 
 These functions are meant to be used very flexibly and they have the following special features:
 
-1. Both functions allow to either specify a keypair or a general signer in order to sign the extrinsics. The keypair is generally useful for command line tools whereas the signer is more useful in a browser context, where it can give access to a wallets or browser extensions.
+1. The first two functions allow to either specify a keypair or a general signer in order to sign the extrinsics. The keypair is generally useful for command line tools whereas the signer is more useful in a browser context, where it can give access to a wallets or browser extensions.
 
-2. In certain applications it can be necessary to extend the extrinsics created by these two functions, e.g., to wrap them into a sudo call. For that reason these functions allow to specify an optional argument `modifyExtrinsic` that allows the caller to arbitrarily change or extend the created extrinsic.
+2. In certain applications it can be necessary to extend the extrinsics created in the first two functions, e.g., to wrap them into a sudo call. For that reason these functions allow to specify an optional argument `modifyExtrinsic` that allows the caller to arbitrarily change or extend the created extrinsic.
 
-3. Contracts usually emit events and these events can be emitted by contracts (recursively) called by the original contract. In order to properly decode the binary data contained in the event, one needs to lookup the abi of the respective contract emitting the event. For that reason both functions take an optional argument `lookupAbi` that allows the caller to provide the abi for any deployed contract (identified through the contract address).
+3. Contracts usually emit events and these events can be emitted by contracts (recursively) called by the original contract. In order to properly decode the binary data contained in the event, one needs to lookup the abi of the respective contract emitting the event. For that reason the first two functions take an optional argument `lookupAbi` that allows the caller to provide the abi for any deployed contract (identified through the contract address).
 
-4. They can correctly decode the return value of message calls, i.e., whether a message call reverted (including the revert message) or whether it panicked and why it panicked.
+4. All functions can correctly decode the return value of message calls, i.e., whether a message call reverted (including the revert message) or whether it panicked and why it panicked.
+
+The differences between the message call by extrinsic and the message call by RPC methods are:
+
+- the dry-run does not cost any fees
+- the dry-run does not require signatures or secret keys
+- the dry-run is executed immediately, and does not need to wait for a block
+- the dry-run returns an output value
+- changes to the chain or contract storage during the dry-run will be discarded after the call
 
 ## Deploy a smart contract
 
@@ -93,7 +102,7 @@ The return value of this function is an object that contains the field `type`. T
 
 ## Execute a Message Call
 
-The function `messageCall` has the following arguments:
+The function `executeMessage` has the following arguments:
 
 - `api`: the polkadot-js `ApiPromise` object
 
@@ -113,10 +122,6 @@ The function `messageCall` has the following arguments:
   This needs to be the address of a deployed contracts that has the abi specified by `abi`
 
 - `callerAddress`: the address of the caller of the contract
-
-- `getSigner`: a callback to provide the signer of the extrinsic
-
-  This callback will only be invoked when the message is mutating and therefore requires that an extrinsic is submitted to the chain (otherwise, `messageCall` will only make an rpc call). The address associated with the signer should be the same as `callerAddress`.
 
 - `messageName`: the name of the message
 
@@ -140,6 +145,7 @@ The function `messageCall` has the following arguments:
 
 - `getSigner`: Specifies the signer of the extrinsic submitted to the chain.
 
+  This callback will be invoked when an extrinsic is submitted to the chain. The address associated with the signer should be the same as `callerAddress`.
   This can either be a keypair or any generic signer. If it is a keypair, then it needs to have the format
 
   ```
@@ -161,18 +167,68 @@ The function `messageCall` has the following arguments:
 
 - `modifyExtrinsic`: allows to extend the generated extrinsic.
 
-  This is an optional function that allows the caller to extend, modify or wrap the extrinsic created by `messageCall` before it is submitted to the chain.
+  This is an optional function that allows the caller to extend, modify or wrap the extrinsic created by `executeMessage` before it is submitted to the chain.
 
 - `lookupAbi`: provide abi for deployed contracts
 
-  This is an optional argument that allows to provide the abi of any deployed contract (specified by the address of the contract). This allows `messageCall` to properly decode events emitted during contract execuction.
+  This is an optional argument that allows to provide the abi of any deployed contract (specified by the address of the contract). This allows `executeMessage` to properly decode events emitted during contract execuction.
 
 The return value of this function is an object that contains two entries `execution` and `result`. The `execution` entry contains the field `type`, which can be either one of
 
-- `onlyQuery`: in this case only the rpc method has been executed because an error occurred before submitting an extrinsic or because the message is immutable and does not require an extrinsic
+- `onlyQuery`: in this case only the rpc method has been executed because an error occurred before submitting an extrinsic
 - `extrinsic`: an extrinsic has been submitted to execute the message call – in this case the `execution` object also contains the entries `contractEvents` (which is the collection of (decoded) contract events that were emitted during contract execution) and the `transactionFee` that the signer had to pay
 
-The `result` object has the field `type` which is either one of the following values:
+The `result` object contains the entry `gasMetrics` with the sub entries `gasRequired` and `gasConsumed` (both are a `Weight`). Furthermore, it has the field `type` which is either one of the following values:
+
+- `"success"`: in this case the deployment was message call was successful and it contains a return value in the entry `value`
+- `"error"`: in this case there was a general error when submitting the extrinsic and the return object contains the entry `error` (a string with an error description)
+- `"reverted"`: in this case the contract reverted and the return object contains the revert message in the entry `description`
+- `"panic"`: in this case the contract panicked and the return object contains the entries `errorCode` (a numerical error code) and `explanation` (an explanation of the error code)
+
+## Dry Run a Message Call (Read Message)
+
+The function `readMessage` has the following arguments:
+
+- `api`: the polkadot-js `ApiPromise` object
+
+  This is the `ApiPromise` object that polkadot-js creates when connecting to an RPC node of a chain.
+
+- `abi`: The abi (metadata) of the smart contract
+
+  This needs to be an object of type `Abi`. It can be constructed from the metadata JSON file (that is generated by Solang) as follows:
+
+  ```
+  const metadata = JSON.parse(metadataString);
+  new Abi(metadata, api.registry.getChainProperties());
+  ```
+
+- `contractDeploymentAddress`: the address of the contract
+
+  This needs to be the address of a deployed contracts that has the abi specified by `abi`
+
+- `callerAddress`: the address of the caller of the contract
+
+- `messageName`: the name of the message
+
+- `messageArguments`: the array with the arguments to the message
+
+- `limits`: the resource limits
+
+  These limits specify the resources that are allowed to be used for the execution. They need to be specified as the type
+
+  ```
+  {
+    gas: {
+      refTime: string | number;
+      proofSize: string | number;
+    };
+    storageDeposit?: string | number;
+  }
+  ```
+
+  The `gas.refTime` and `gas.proofSize` entries specify limits of the gas usage. The optional argument `storageDeposit` specifies a limit for the storage deposit.
+
+The return value of this function contains the entry `gasMetrics` with the sub entries `gasRequired` and `gasConsumed` (both are a `Weight`). Furthermore, it has the field `type` which is either one of the following values:
 
 - `"success"`: in this case the deployment was message call was successful and it contains a return value in the entry `value`
 - `"error"`: in this case there was a general error when submitting the extrinsic and the return object contains the entry `error` (a string with an error description)

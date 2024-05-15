@@ -1,7 +1,7 @@
 import { ApiPromise } from "@polkadot/api";
 import { BN_ZERO } from "@polkadot/util";
 import { ContractPromise } from "@polkadot/api-contract";
-import { EventRecord } from "@polkadot/types/interfaces";
+import { EventRecord, Weight } from "@polkadot/types/interfaces";
 import { AnyJson } from "@polkadot/types-codec/types";
 import { Abi } from "@polkadot/api-contract";
 
@@ -65,7 +65,7 @@ export type DeployContractResult =
   | { type: "reverted"; description: string }
   | { type: "panic"; errorCode: PanicCode; explanation: string };
 
-export interface MessageCallOptions {
+export interface ExecuteMessageOptions {
   abi: Abi;
   api: ApiPromise;
   contractDeploymentAddress: Address;
@@ -79,16 +79,33 @@ export interface MessageCallOptions {
   gasLimitTolerancePercentage?: number;
 }
 
-export type MessageCallResult = {
+export type ExecuteMessageResult = {
   execution:
-    | { type: "onlyQuery" }
+    | { type: "onlyRpc" }
     | { type: "extrinsic"; contractEvents: ContractEvent[]; transactionFee: bigint | undefined };
-  result:
-    | { type: "success"; value: any }
-    | { type: "error"; error: string }
-    | { type: "reverted"; description: string }
-    | { type: "panic"; errorCode: PanicCode; explanation: string };
+  result: ReadMessageResult;
 };
+
+export interface ReadMessageOptions {
+  abi: Abi;
+  api: ApiPromise;
+  contractDeploymentAddress: Address;
+  callerAddress: Address;
+  messageName: string;
+  messageArguments: unknown[];
+  limits: Limits;
+}
+
+export type GasMetrics = {
+  gasRequired: Weight;
+  gasConsumed: Weight;
+};
+
+export type ReadMessageResult =
+  | { type: "success"; gasMetrics: GasMetrics; value: any }
+  | { type: "error"; gasMetrics: GasMetrics; error: string }
+  | { type: "reverted"; gasMetrics: GasMetrics; description: string }
+  | { type: "panic"; gasMetrics: GasMetrics; errorCode: PanicCode; explanation: string };
 
 function decodeContractEvents(
   eventRecords: EventRecord[],
@@ -162,7 +179,7 @@ export async function deployContract({
   return { ...result, events: decodeContractEvents(result.eventRecords, extendedLookupAbi) };
 }
 
-export async function messageCall({
+export async function executeMessage({
   abi,
   api,
   contractDeploymentAddress,
@@ -174,36 +191,24 @@ export async function messageCall({
   modifyExtrinsic,
   lookupAbi,
   gasLimitTolerancePercentage = 10,
-}: MessageCallOptions): Promise<MessageCallResult> {
+}: ExecuteMessageOptions): Promise<ExecuteMessageResult> {
   const contract = new ContractPromise(api, abi, contractDeploymentAddress);
 
-  let { gasRequired, output } = await rpcCall({
+  let readMessageResult = await readMessage({
     api,
     abi,
-    contractAddress: contractDeploymentAddress,
+    contractDeploymentAddress,
     callerAddress,
-    limits,
     messageName,
     messageArguments,
+    limits,
   });
 
-  switch (output.type) {
-    case "reverted":
-      return { execution: { type: "onlyQuery" }, result: output };
-    case "panic":
-      return { execution: { type: "onlyQuery" }, result: output };
-    case "error":
-      return {
-        execution: { type: "onlyQuery" },
-        result: { type: "error", error: output.description ?? "unknown" },
-      };
+  if (readMessageResult.type !== "success") {
+    return { execution: { type: "onlyRpc" }, result: readMessageResult };
   }
 
-  const message = abi.findMessage(messageName);
-  if (!message.isMutating) {
-    return { execution: { type: "onlyQuery" }, result: output };
-  }
-
+  let gasRequired = readMessageResult.gasMetrics.gasRequired;
   if (gasLimitTolerancePercentage > 0) {
     gasRequired = api.createType("WeightV2", {
       refTime: (gasRequired.refTime.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
@@ -229,6 +234,42 @@ export async function messageCall({
 
   return {
     execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
-    result: status.type === "success" ? { type: "success", value: output.value } : status,
+    result: status.type === "success" ? readMessageResult : { ...status, gasMetrics: readMessageResult.gasMetrics },
   };
+}
+
+export async function readMessage({
+  abi,
+  api,
+  contractDeploymentAddress,
+  callerAddress,
+  messageName,
+  messageArguments,
+  limits,
+}: ReadMessageOptions): Promise<ReadMessageResult> {
+  const { gasRequired, gasConsumed, output } = await rpcCall({
+    api,
+    abi,
+    contractAddress: contractDeploymentAddress,
+    callerAddress,
+    limits,
+    messageName,
+    messageArguments,
+  });
+
+  const gasMetrics = { gasRequired, gasConsumed };
+
+  switch (output.type) {
+    case "success":
+    case "reverted":
+    case "panic":
+      return { ...output, gasMetrics };
+
+    case "error":
+      return {
+        type: "error",
+        error: output.description ?? "unknown",
+        gasMetrics,
+      };
+  }
 }
