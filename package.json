@@ -1,6 +1,6 @@
 {
   "name": "@pendulum-chain/api-solang",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Interface to interact with smart contracts compiled via Solang",
   "main": "build/esm/index.js",
   "devDependencies": {
