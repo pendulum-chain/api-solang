@@ -4,6 +4,7 @@ import { ContractPromise } from "@polkadot/api-contract";
 import { EventRecord, Weight } from "@polkadot/types/interfaces";
 import { AnyJson } from "@polkadot/types-codec/types";
 import { Abi } from "@polkadot/api-contract";
+import { AddressOrPair, SignerOptions } from "@polkadot/api/types";
 
 import { PanicCode, rpcCall } from "./contractRpc.js";
 import {
@@ -12,6 +13,7 @@ import {
   KeyPairSigner,
   SubmitExtrinsicStatus,
   SubmitExtrinsicResult,
+  submitAndSignExtrinsic,
   submitExtrinsic,
 } from "./submitExtrinsic.js";
 import { addressEq } from "@polkadot/util-crypto";
@@ -24,7 +26,7 @@ export {
   KeyPairSigner,
   SubmitExtrinsicStatus,
   SubmitExtrinsicResult,
-  submitExtrinsic,
+  submitAndSignExtrinsic as submitExtrinsic,
 };
 
 export type Address = string;
@@ -65,18 +67,26 @@ export type DeployContractResult =
   | { type: "reverted"; description: string }
   | { type: "panic"; errorCode: PanicCode; explanation: string };
 
-export interface ExecuteMessageOptions {
+export interface CreateExecuteMessageExtrinsicOptions {
   abi: Abi;
   api: ApiPromise;
   contractDeploymentAddress: Address;
   callerAddress: Address;
-  getSigner: () => Promise<KeyPairSigner | GenericSigner>;
   messageName: string;
   messageArguments: unknown[];
   limits: Limits;
+  gasLimitTolerancePercentage?: number;
+}
+
+export type CreateExecuteMessageExtrinsicResult = {
+  execution: { type: "onlyRpc" } | { type: "extrinsic"; extrinsic: Extrinsic };
+  result: ReadMessageResult;
+};
+
+export interface ExecuteMessageOptions extends CreateExecuteMessageExtrinsicOptions {
+  getSigner: () => Promise<KeyPairSigner | GenericSigner>;
   modifyExtrinsic?: (extrinsic: Extrinsic) => Extrinsic;
   lookupAbi?: (contractAddress: Address) => Abi | undefined;
-  gasLimitTolerancePercentage?: number;
 }
 
 export type ExecuteMessageResult = {
@@ -185,7 +195,32 @@ export async function deployContract({
   return { ...result, events: decodeContractEvents(result.eventRecords, extendedLookupAbi) };
 }
 
-export async function executeMessage({
+export async function executeMessage(options: ExecuteMessageOptions): Promise<ExecuteMessageResult> {
+  const { getSigner, modifyExtrinsic, lookupAbi } = options;
+  const { execution, result: readMessageResult } = await createExecuteMessageExtrinsic(options);
+
+  if (execution.type === "onlyRpc") {
+    return {
+      execution,
+      result: readMessageResult,
+    };
+  }
+
+  let { extrinsic } = execution;
+  if (modifyExtrinsic) {
+    extrinsic = modifyExtrinsic(extrinsic);
+  }
+
+  const signer = await getSigner();
+  const { eventRecords, status, transactionFee } = await submitAndSignExtrinsic(extrinsic, signer);
+
+  return {
+    execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
+    result: status.type === "success" ? readMessageResult : { ...status, gasMetrics: readMessageResult.gasMetrics },
+  };
+}
+
+export async function createExecuteMessageExtrinsic({
   abi,
   api,
   contractDeploymentAddress,
@@ -193,11 +228,8 @@ export async function executeMessage({
   messageName,
   limits,
   callerAddress,
-  getSigner,
-  modifyExtrinsic,
-  lookupAbi,
   gasLimitTolerancePercentage = 10,
-}: ExecuteMessageOptions): Promise<ExecuteMessageResult> {
+}: ExecuteMessageOptions): Promise<CreateExecuteMessageExtrinsicResult> {
   const contract = new ContractPromise(api, abi, contractDeploymentAddress);
 
   let readMessageResult = await readMessage({
@@ -231,16 +263,19 @@ export async function executeMessage({
     contract.abi.findMessage(messageName).toU8a(messageArguments)
   );
 
-  if (modifyExtrinsic) {
-    extrinsic = modifyExtrinsic(extrinsic);
-  }
+  return { execution: { type: "extrinsic", extrinsic }, result: readMessageResult };
+}
 
-  const signer = await getSigner();
-  const { eventRecords, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
+export async function submitExecuteMessageExtrinsic(
+  extrinsic: Extrinsic,
+  lookupAbi?: (contractAddress: Address) => Abi | undefined
+): Promise<{ contractEvents: ContractEvent[]; transactionFee: bigint | undefined; status: SubmitExtrinsicStatus }> {
+  const { eventRecords, status, transactionFee } = await submitExtrinsic(extrinsic);
 
   return {
-    execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
-    result: status.type === "success" ? readMessageResult : { ...status, gasMetrics: readMessageResult.gasMetrics },
+    contractEvents: decodeContractEvents(eventRecords, lookupAbi),
+    transactionFee,
+    status,
   };
 }
 

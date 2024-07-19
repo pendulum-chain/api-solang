@@ -38,28 +38,32 @@ export function getSignerAddress(signer: KeyPairSigner | GenericSigner) {
   }
 }
 
-export async function submitExtrinsic(
+export async function submitAndSignExtrinsic(
   extrinsic: Extrinsic,
   signer: KeyPairSigner | GenericSigner
 ): Promise<SubmitExtrinsicResult> {
+  let account: AddressOrPair;
+  let signerOptions: Partial<SignerOptions>;
+
+  switch (signer.type) {
+    case "keypair":
+      account = signer.keypair;
+      signerOptions = { nonce: -1 };
+      break;
+
+    case "signer":
+      account = signer.address;
+      signerOptions = { nonce: -1, signer: signer.signer };
+      break;
+  }
+  const signedExtrinsic = await extrinsic.signAsync(account, signerOptions);
+  return submitExtrinsic(signedExtrinsic);
+}
+
+export async function submitExtrinsic(extrinsic: Extrinsic): Promise<SubmitExtrinsicResult> {
   return await new Promise<SubmitExtrinsicResult>(async (resolve, reject) => {
     try {
-      let account: AddressOrPair;
-      let signerOptions: Partial<SignerOptions>;
-
-      switch (signer.type) {
-        case "keypair":
-          account = signer.keypair;
-          signerOptions = { nonce: -1 };
-          break;
-
-        case "signer":
-          account = signer.address;
-          signerOptions = { nonce: -1, signer: signer.signer };
-          break;
-      }
-
-      const unsub = await extrinsic.signAndSend(account, signerOptions, (update) => {
+      const unsub = await extrinsic.send((update) => {
         const { status, events: eventRecords } = update;
 
         if (status.isInBlock || status.isFinalized) {
