@@ -38,10 +38,15 @@ export function getSignerAddress(signer: KeyPairSigner | GenericSigner) {
   }
 }
 
-export async function submitAndSignExtrinsic(
+export async function signAndSubmitExtrinsic(
   extrinsic: Extrinsic,
   signer: KeyPairSigner | GenericSigner
 ): Promise<SubmitExtrinsicResult> {
+  const signedExtrinsic = await signExtrinsic(extrinsic, signer);
+  return submitExtrinsic(signedExtrinsic);
+}
+
+export async function signExtrinsic(extrinsic: Extrinsic, signer: KeyPairSigner | GenericSigner): Promise<Extrinsic> {
   let account: AddressOrPair;
   let signerOptions: Partial<SignerOptions>;
 
@@ -56,8 +61,7 @@ export async function submitAndSignExtrinsic(
       signerOptions = { nonce: -1, signer: signer.signer };
       break;
   }
-  const signedExtrinsic = await extrinsic.signAsync(account, signerOptions);
-  return submitExtrinsic(signedExtrinsic);
+  return extrinsic.signAsync(account, signerOptions);
 }
 
 export async function submitExtrinsic(extrinsic: Extrinsic): Promise<SubmitExtrinsicResult> {

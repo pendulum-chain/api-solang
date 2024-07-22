@@ -9,7 +9,7 @@ import {
   GenericSigner,
   KeyPairSigner,
   getSignerAddress,
-  submitAndSignExtrinsic,
+  signAndSubmitExtrinsic,
 } from "./submitExtrinsic.js";
 import { PanicCode, rpcInstantiate } from "./contractRpc.js";
 
@@ -72,7 +72,7 @@ export async function basicDeployContract({
   if (modifyExtrinsic) {
     extrinsic = modifyExtrinsic(extrinsic);
   }
-  const { eventRecords, status, transactionFee } = await submitAndSignExtrinsic(extrinsic, signer);
+  const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(extrinsic, signer);
 
   if (status.type === "error") {
     return { type: "error", error: `Contract could not be deployed: ${status.error}` };

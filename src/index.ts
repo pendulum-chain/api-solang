@@ -13,8 +13,9 @@ import {
   KeyPairSigner,
   SubmitExtrinsicStatus,
   SubmitExtrinsicResult,
-  submitAndSignExtrinsic,
+  signAndSubmitExtrinsic,
   submitExtrinsic,
+  signExtrinsic,
 } from "./submitExtrinsic.js";
 import { addressEq } from "@polkadot/util-crypto";
 import { basicDeployContract } from "./deployContract.js";
@@ -26,7 +27,9 @@ export {
   KeyPairSigner,
   SubmitExtrinsicStatus,
   SubmitExtrinsicResult,
-  submitAndSignExtrinsic as submitExtrinsic,
+  signExtrinsic,
+  submitExtrinsic,
+  signAndSubmitExtrinsic,
 };
 
 export type Address = string;
@@ -212,7 +215,7 @@ export async function executeMessage(options: ExecuteMessageOptions): Promise<Ex
   }
 
   const signer = await getSigner();
-  const { eventRecords, status, transactionFee } = await submitAndSignExtrinsic(extrinsic, signer);
+  const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(extrinsic, signer);
 
   return {
     execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
