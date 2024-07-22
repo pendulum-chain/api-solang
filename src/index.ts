@@ -232,7 +232,7 @@ export async function createExecuteMessageExtrinsic({
   limits,
   callerAddress,
   gasLimitTolerancePercentage = 10,
-}: ExecuteMessageOptions): Promise<CreateExecuteMessageExtrinsicResult> {
+}: CreateExecuteMessageExtrinsicOptions): Promise<CreateExecuteMessageExtrinsicResult> {
   const contract = new ContractPromise(api, abi, contractDeploymentAddress);
 
   let readMessageResult = await readMessage({
