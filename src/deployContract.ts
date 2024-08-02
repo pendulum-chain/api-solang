@@ -4,7 +4,13 @@ import { AccountId, EventRecord } from "@polkadot/types/interfaces";
 import { ITuple } from "@polkadot/types-codec/types";
 
 import { Limits, Address } from "./index.js";
-import { Extrinsic, GenericSigner, KeyPairSigner, getSignerAddress, submitExtrinsic } from "./submitExtrinsic.js";
+import {
+  Extrinsic,
+  GenericSigner,
+  KeyPairSigner,
+  getSignerAddress,
+  signAndSubmitExtrinsic,
+} from "./submitExtrinsic.js";
 import { PanicCode, rpcInstantiate } from "./contractRpc.js";
 
 export interface BasicDeployContractOptions {
@@ -66,7 +72,7 @@ export async function basicDeployContract({
   if (modifyExtrinsic) {
     extrinsic = modifyExtrinsic(extrinsic);
   }
-  const { eventRecords, status, transactionFee } = await submitExtrinsic(extrinsic, signer);
+  const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(extrinsic, signer);
 
   if (status.type === "error") {
     return { type: "error", error: `Contract could not be deployed: ${status.error}` };

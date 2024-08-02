@@ -237,7 +237,7 @@ The return value of this function contains the entry `gasMetrics` with the sub e
 
 ## Submit an Extrinsic
 
-Additionally this module also exposes a function `submitExtrinsic` that allows to submit an arbitrary extrinsic and that processes the chain events in order to determine the execution status of the extrinsic.
+Additionally this module also exposes a function `signAndSubmitExtrinsic` that allows to submit an arbitrary extrinsic and that processes the chain events in order to determine the execution status of the extrinsic.
 
 It has two arguments:
 
