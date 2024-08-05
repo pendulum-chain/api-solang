@@ -1,7 +1,7 @@
 import { ApiPromise } from "@polkadot/api";
 import { BN_ZERO } from "@polkadot/util";
 import { ContractPromise } from "@polkadot/api-contract";
-import { EventRecord, Weight } from "@polkadot/types/interfaces";
+import { EventRecord, Weight, WeightV2 } from "@polkadot/types/interfaces";
 import { AnyJson } from "@polkadot/types-codec/types";
 import { Abi } from "@polkadot/api-contract";
 import { AddressOrPair, SignerOptions } from "@polkadot/api/types";
@@ -79,11 +79,12 @@ export interface CreateExecuteMessageExtrinsicOptions {
   messageArguments: unknown[];
   limits: Limits;
   gasLimitTolerancePercentage?: number;
+  skipDryRunning?: boolean;
 }
 
 export type CreateExecuteMessageExtrinsicResult = {
   execution: { type: "onlyRpc" } | { type: "extrinsic"; extrinsic: Extrinsic };
-  result: ReadMessageResult;
+  result?: ReadMessageResult;
 };
 
 export interface ExecuteMessageOptions extends CreateExecuteMessageExtrinsicOptions {
@@ -96,7 +97,7 @@ export type ExecuteMessageResult = {
   execution:
     | { type: "onlyRpc" }
     | { type: "extrinsic"; contractEvents: ContractEvent[]; transactionFee: bigint | undefined };
-  result: ReadMessageResult;
+  result?: ReadMessageResult;
 };
 
 export interface ReadMessageOptions {
@@ -219,7 +220,10 @@ export async function executeMessage(options: ExecuteMessageOptions): Promise<Ex
 
   return {
     execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
-    result: status.type === "success" ? readMessageResult : { ...status, gasMetrics: readMessageResult.gasMetrics },
+    result:
+      status.type === "success" || readMessageResult === undefined
+        ? readMessageResult
+        : { ...status, gasMetrics: readMessageResult.gasMetrics },
   };
 }
 
@@ -232,29 +236,37 @@ export async function createExecuteMessageExtrinsic({
   limits,
   callerAddress,
   gasLimitTolerancePercentage = 10,
+  skipDryRunning,
 }: CreateExecuteMessageExtrinsicOptions): Promise<CreateExecuteMessageExtrinsicResult> {
   const contract = new ContractPromise(api, abi, contractDeploymentAddress);
 
-  let readMessageResult = await readMessage({
-    api,
-    abi,
-    contractDeploymentAddress,
-    callerAddress,
-    messageName,
-    messageArguments,
-    limits,
-  });
+  let gasRequired: WeightV2;
+  let readMessageResult: ReadMessageResult | undefined;
 
-  if (readMessageResult.type !== "success") {
-    return { execution: { type: "onlyRpc" }, result: readMessageResult };
-  }
-
-  let gasRequired = readMessageResult.gasMetrics.gasRequired;
-  if (gasLimitTolerancePercentage > 0) {
-    gasRequired = api.createType("WeightV2", {
-      refTime: (gasRequired.refTime.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
-      proofSize: (gasRequired.proofSize.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
+  if (skipDryRunning === true) {
+    gasRequired = api.createType("WeightV2", limits.gas);
+  } else {
+    readMessageResult = await readMessage({
+      api,
+      abi,
+      contractDeploymentAddress,
+      callerAddress,
+      messageName,
+      messageArguments,
+      limits,
     });
+
+    if (readMessageResult.type !== "success") {
+      return { execution: { type: "onlyRpc" }, result: readMessageResult };
+    }
+
+    gasRequired = readMessageResult.gasMetrics.gasRequired;
+    if (gasLimitTolerancePercentage > 0) {
+      gasRequired = api.createType("WeightV2", {
+        refTime: (gasRequired.refTime.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
+        proofSize: (gasRequired.proofSize.toBigInt() * (100n + BigInt(gasLimitTolerancePercentage))) / 100n,
+      });
+    }
   }
 
   const typesAddress = api.registry.createType("AccountId", contractDeploymentAddress);
