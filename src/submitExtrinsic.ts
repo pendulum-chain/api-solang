@@ -1,15 +1,5 @@
-import {
-  AccountId32,
-  DispatchError,
-  DispatchInfo,
-  EventRecord,
-  Hash,
-} from "@polkadot/types/interfaces";
-import {
-  AddressOrPair,
-  SignerOptions,
-  SubmittableExtrinsic,
-} from "@polkadot/api/types";
+import { AccountId32, DispatchError, DispatchInfo, EventRecord, Hash } from "@polkadot/types/interfaces";
+import { AddressOrPair, SignerOptions, SubmittableExtrinsic } from "@polkadot/api/types";
 import { ISubmittableResult, Signer } from "@polkadot/types/types";
 import { INumber, ITuple } from "@polkadot/types-codec/types";
 import { KeyringPair } from "@polkadot/keyring/types";
@@ -19,9 +9,7 @@ import { Address } from "./index.js";
 
 export type Extrinsic = SubmittableExtrinsic<"promise", ISubmittableResult>;
 
-export type SubmitExtrinsicStatus =
-  | { type: "success" }
-  | { type: "error"; error: string };
+export type SubmitExtrinsicStatus = { type: "success" } | { type: "error"; error: string };
 
 export interface SubmitExtrinsicResult {
   transactionFee: bigint | undefined;
@@ -60,10 +48,7 @@ export async function signAndSubmitExtrinsic(
   return submitExtrinsic(signedExtrinsic);
 }
 
-export async function signExtrinsic(
-  extrinsic: Extrinsic,
-  signer: KeyPairSigner | GenericSigner
-): Promise<Extrinsic> {
+export async function signExtrinsic(extrinsic: Extrinsic, signer: KeyPairSigner | GenericSigner): Promise<Extrinsic> {
   let account: AddressOrPair;
   let signerOptions: Partial<SignerOptions>;
 
@@ -81,9 +66,7 @@ export async function signExtrinsic(
   return extrinsic.signAsync(account, signerOptions);
 }
 
-export async function submitExtrinsic(
-  extrinsic: Extrinsic
-): Promise<SubmitExtrinsicResult> {
+export async function submitExtrinsic(extrinsic: Extrinsic): Promise<SubmitExtrinsicResult> {
   return await new Promise<SubmitExtrinsicResult>(async (resolve, reject) => {
     try {
       const unsub = await extrinsic.send((update) => {
@@ -96,20 +79,13 @@ export async function submitExtrinsic(
           for (const eventRecord of eventRecords) {
             const { data, section, method } = eventRecord.event;
 
-            if (
-              section === "transactionPayment" &&
-              method === "TransactionFeePaid"
-            ) {
-              const [, actualFee] = data as unknown as ITuple<
-                [AccountId32, INumber, INumber]
-              >;
+            if (section === "transactionPayment" && method === "TransactionFeePaid") {
+              const [, actualFee] = data as unknown as ITuple<[AccountId32, INumber, INumber]>;
               transactionFee = actualFee.toBigInt();
             }
 
             if (section === "system" && method === "ExtrinsicFailed") {
-              const [dispatchError] = data as unknown as ITuple<
-                [DispatchError, DispatchInfo]
-              >;
+              const [dispatchError] = data as unknown as ITuple<[DispatchError, DispatchInfo]>;
               status = {
                 type: "error",
                 error: extractDispatchErrorDescription(dispatchError),

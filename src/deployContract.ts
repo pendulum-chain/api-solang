@@ -72,18 +72,12 @@ export async function basicDeployContract({
 
   const { storageDeposit: storageDepositLimit } = limits;
 
-  let extrinsic = code.tx[constructorName](
-    { gasLimit: gasRequired, storageDepositLimit },
-    ...constructorArguments
-  );
+  let extrinsic = code.tx[constructorName]({ gasLimit: gasRequired, storageDepositLimit }, ...constructorArguments);
 
   if (modifyExtrinsic) {
     extrinsic = modifyExtrinsic(extrinsic);
   }
-  const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(
-    extrinsic,
-    signer
-  );
+  const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(extrinsic, signer);
 
   if (status.type === "error") {
     return {

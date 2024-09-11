@@ -73,13 +73,9 @@ function extractContractExecutionOutput(
   const data = result.data.toU8a(true);
   if (!result.flags.isRevert) {
     const value = returnType
-      ? abi.registry.createTypeUnsafe(
-          returnType.lookupName || returnType.type,
-          [data],
-          {
-            isPedantic: true,
-          }
-        )
+      ? abi.registry.createTypeUnsafe(returnType.lookupName || returnType.type, [data], {
+          isPedantic: true,
+        })
       : undefined;
     return { type: "success", value };
   } else {
@@ -149,12 +145,7 @@ export async function rpcCall({
         resolve({
           gasRequired,
           gasConsumed,
-          output: extractContractExecutionOutput(
-            api,
-            abi,
-            result.asOk,
-            message.returnType
-          ),
+          output: extractContractExecutionOutput(api, abi, result.asOk, message.returnType),
         });
       } else {
         resolve({
@@ -196,16 +187,15 @@ export async function rpcInstantiate({
 
     //const code = api.createType("Code", { Upload: abi.info.source.wasm });
 
-    const observable =
-      api.rx.call.contractsApi.instantiate<ContractInstantiateResult>(
-        callerAddress,
-        BN_ZERO,
-        api.createType("WeightV2", limits.gas),
-        limits.storageDeposit,
-        { Upload: abi.info.source.wasm },
-        data,
-        salt
-      );
+    const observable = api.rx.call.contractsApi.instantiate<ContractInstantiateResult>(
+      callerAddress,
+      BN_ZERO,
+      api.createType("WeightV2", limits.gas),
+      limits.storageDeposit,
+      { Upload: abi.info.source.wasm },
+      data,
+      salt
+    );
 
     observable.forEach((event) => {
       if (resolved) {
@@ -219,12 +209,7 @@ export async function rpcInstantiate({
         resolve({
           gasRequired,
           gasConsumed,
-          output: extractContractExecutionOutput(
-            api,
-            abi,
-            result.asOk.result,
-            constructor.returnType
-          ),
+          output: extractContractExecutionOutput(api, abi, result.asOk.result, constructor.returnType),
         });
       } else {
         resolve({
