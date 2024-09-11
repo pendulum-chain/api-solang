@@ -1,10 +1,9 @@
 import { ApiPromise } from "@polkadot/api";
 import { BN_ZERO } from "@polkadot/util";
 import { ContractPromise } from "@polkadot/api-contract";
-import { EventRecord, Weight, WeightV2 } from "@polkadot/types/interfaces";
+import { EventRecord, Hash, Weight, WeightV2 } from "@polkadot/types/interfaces";
 import { AnyJson } from "@polkadot/types-codec/types";
 import { Abi } from "@polkadot/api-contract";
-import { AddressOrPair, SignerOptions } from "@polkadot/api/types";
 
 import { PanicCode, rpcCall } from "./contractRpc.js";
 import {
@@ -96,7 +95,7 @@ export interface ExecuteMessageOptions extends CreateExecuteMessageExtrinsicOpti
 export type ExecuteMessageResult = {
   execution:
     | { type: "onlyRpc" }
-    | { type: "extrinsic"; contractEvents: ContractEvent[]; transactionFee: bigint | undefined };
+    | { type: "extrinsic";  contractEvents: ContractEvent[]; transactionFee: bigint | undefined, txHash: Hash, txIndex?: number | undefined };
   result?: ReadMessageResult;
 };
 
@@ -216,10 +215,10 @@ export async function executeMessage(options: ExecuteMessageOptions): Promise<Ex
   }
 
   const signer = await getSigner();
-  const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(extrinsic, signer);
+  const { eventRecords, status, transactionFee, txIndex, txHash } = await signAndSubmitExtrinsic(extrinsic, signer);
 
   return {
-    execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee },
+    execution: { type: "extrinsic", contractEvents: decodeContractEvents(eventRecords, lookupAbi), transactionFee, txIndex, txHash },
     result:
       status.type === "success" || readMessageResult === undefined
         ? readMessageResult
