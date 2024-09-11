@@ -1,4 +1,4 @@
-import { AccountId32, DispatchError, DispatchInfo, EventRecord } from "@polkadot/types/interfaces";
+import { AccountId32, DispatchError, DispatchInfo, EventRecord, Hash } from "@polkadot/types/interfaces";
 import { AddressOrPair, SignerOptions, SubmittableExtrinsic } from "@polkadot/api/types";
 import { ISubmittableResult, Signer } from "@polkadot/types/types";
 import { INumber, ITuple } from "@polkadot/types-codec/types";
@@ -15,6 +15,8 @@ export interface SubmitExtrinsicResult {
   transactionFee: bigint | undefined;
   eventRecords: EventRecord[];
   status: SubmitExtrinsicStatus;
+  txHash: Hash;
+  txIndex?: number | undefined;
 }
 
 export interface KeyPairSigner {
@@ -68,7 +70,7 @@ export async function submitExtrinsic(extrinsic: Extrinsic): Promise<SubmitExtri
   return await new Promise<SubmitExtrinsicResult>(async (resolve, reject) => {
     try {
       const unsub = await extrinsic.send((update) => {
-        const { status, events: eventRecords } = update;
+        const { status, events: eventRecords, txHash, txIndex } = update;
 
         if (status.isInBlock || status.isFinalized) {
           let transactionFee: bigint | undefined = undefined;
@@ -84,7 +86,10 @@ export async function submitExtrinsic(extrinsic: Extrinsic): Promise<SubmitExtri
 
             if (section === "system" && method === "ExtrinsicFailed") {
               const [dispatchError] = data as unknown as ITuple<[DispatchError, DispatchInfo]>;
-              status = { type: "error", error: extractDispatchErrorDescription(dispatchError) };
+              status = {
+                type: "error",
+                error: extractDispatchErrorDescription(dispatchError),
+              };
             }
 
             if (section === "system" && method === "ExtrinsicSuccess") {
@@ -94,7 +99,13 @@ export async function submitExtrinsic(extrinsic: Extrinsic): Promise<SubmitExtri
 
           if (status !== undefined) {
             unsub();
-            resolve({ transactionFee, eventRecords, status });
+            resolve({
+              transactionFee,
+              eventRecords,
+              status,
+              txHash,
+              txIndex,
+            });
           }
         }
       });

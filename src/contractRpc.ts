@@ -83,7 +83,10 @@ function extractContractExecutionOutput(
     const prefix = data.buffer.byteLength >= 4 ? dataView.getUint32(0) : 0;
     switch (prefix) {
       case 0x08c379a0:
-        return { type: "reverted", description: api.createType("String", data.slice(4)).toString() };
+        return {
+          type: "reverted",
+          description: api.createType("String", data.slice(4)).toString(),
+        };
 
       case 0x4e487b71:
         try {
@@ -148,7 +151,10 @@ export async function rpcCall({
         resolve({
           gasRequired,
           gasConsumed,
-          output: { type: "error", description: extractDispatchErrorDescription(result.asErr) },
+          output: {
+            type: "error",
+            description: extractDispatchErrorDescription(result.asErr),
+          },
         });
       }
     });
@@ -209,7 +215,10 @@ export async function rpcInstantiate({
         resolve({
           gasRequired,
           gasConsumed,
-          output: { type: "error", description: extractDispatchErrorDescription(result.asErr) },
+          output: {
+            type: "error",
+            description: extractDispatchErrorDescription(result.asErr),
+          },
         });
       }
     });

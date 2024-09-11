@@ -1,10 +1,13 @@
 {
   "name": "@pendulum-chain/api-solang",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Interface to interact with smart contracts compiled via Solang",
   "main": "build/esm/index.js",
   "devDependencies": {
     "@types/node": "^20.6.0",
+    "husky": ">=6",
+    "lint-staged": ">=10",
+    "prettier": "^3.3.3",
     "rimraf": "^5.0.1",
     "typescript": "^5.2.2"
   },
@@ -24,7 +27,8 @@
     "prepublishOnly": "npm run build",
     "simplyPublish": "npm publish --workspace @pendulum-chain/api-solang --access public",
     "compile": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
-    "build": "npm run clean && npm run compile"
+    "build": "npm run clean && npm run compile",
+    "prepare": "husky install"
   },
   "repository": {
     "type": "git",
@@ -57,5 +61,8 @@
       "import": "./build/esm/*.js",
       "default": "./build/esm/*.js"
     }
+  },
+  "lint-staged": {
+    "*.{js,ts,css,md}": "prettier --write"
   }
 }

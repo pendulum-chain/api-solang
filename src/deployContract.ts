@@ -24,7 +24,12 @@ export interface BasicDeployContractOptions {
 }
 
 export type BasicDeployContractResult =
-  | { type: "success"; eventRecords: EventRecord[]; deploymentAddress: Address; transactionFee: bigint | undefined }
+  | {
+      type: "success";
+      eventRecords: EventRecord[];
+      deploymentAddress: Address;
+      transactionFee: bigint | undefined;
+    }
   | { type: "error"; error: string }
   | { type: "reverted"; description: string }
   | { type: "panic"; errorCode: PanicCode; explanation: string };
@@ -75,7 +80,10 @@ export async function basicDeployContract({
   const { eventRecords, status, transactionFee } = await signAndSubmitExtrinsic(extrinsic, signer);
 
   if (status.type === "error") {
-    return { type: "error", error: `Contract could not be deployed: ${status.error}` };
+    return {
+      type: "error",
+      error: `Contract could not be deployed: ${status.error}`,
+    };
   }
 
   let deploymentAddress: Address | undefined = undefined;
