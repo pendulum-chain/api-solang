@@ -12,11 +12,11 @@
     "typescript": "^5.2.2"
   },
   "peerDependencies": {
-    "@polkadot/api": "^10.0",
-    "@polkadot/api-contract": "^10.12.1",
+    "@polkadot/api": "^13.2",
+    "@polkadot/api-contract": "^13.2",
     "@polkadot/keyring": "*",
-    "@polkadot/types": "^10.0",
-    "@polkadot/types-codec": "^10.0",
+    "@polkadot/types": "^13.2",
+    "@polkadot/types-codec": "^13.2",
     "@polkadot/util": "*",
     "@polkadot/util-crypto": "*"
   },
