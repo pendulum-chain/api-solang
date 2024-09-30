@@ -1,6 +1,6 @@
 import { ApiPromise } from "@polkadot/api";
 import { CodePromise, Abi } from "@polkadot/api-contract";
-import { AccountId, EventRecord } from "@polkadot/types/interfaces";
+import { AccountId, EventRecord, WeightV2 } from "@polkadot/types/interfaces";
 import { ITuple } from "@polkadot/types-codec/types";
 
 import { Limits, Address } from "./index.js";
@@ -20,6 +20,7 @@ export interface BasicDeployContractOptions {
   constructorName?: string;
   limits: Limits;
   signer: KeyPairSigner | GenericSigner;
+  skipDryRunning: boolean | undefined;
   modifyExtrinsic?: (extrinsic: Extrinsic) => Extrinsic;
 }
 
@@ -41,6 +42,7 @@ export async function basicDeployContract({
   constructorName,
   limits,
   signer,
+  skipDryRunning,
   modifyExtrinsic,
 }: BasicDeployContractOptions): Promise<BasicDeployContractResult> {
   const code = new CodePromise(api, abi, undefined);
@@ -52,22 +54,30 @@ export async function basicDeployContract({
     throw new Error(`Contract has no constructor called ${constructorName}`);
   }
 
-  const { gasRequired, output } = await rpcInstantiate({
-    api,
-    abi,
-    callerAddress: getSignerAddress(signer),
-    constructorName,
-    limits,
-    constructorArguments,
-  });
+  let gasRequired: WeightV2;
+  if (skipDryRunning === true) {
+    gasRequired = api.createType("WeightV2", limits.gas);
+  } else {
+    const rpcResult = await rpcInstantiate({
+      api,
+      abi,
+      callerAddress: getSignerAddress(signer),
+      constructorName,
+      limits,
+      constructorArguments,
+    });
 
-  switch (output.type) {
-    case "reverted":
-    case "panic":
-      return output;
+    const { output } = rpcResult;
+    gasRequired = rpcResult.gasRequired;
 
-    case "error":
-      return { type: "error", error: output.description ?? "unknown" };
+    switch (output.type) {
+      case "reverted":
+      case "panic":
+        return output;
+
+      case "error":
+        return { type: "error", error: output.description ?? "unknown" };
+    }
   }
 
   const { storageDeposit: storageDepositLimit } = limits;

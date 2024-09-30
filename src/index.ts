@@ -59,6 +59,7 @@ export interface DeployContractOptions {
   constructorArguments: unknown[];
   constructorName?: string;
   limits: Limits;
+  skipDryRunning?: boolean;
   modifyExtrinsic?: (extrinsic: Extrinsic) => Extrinsic;
   lookupAbi?: (contractAddress: Address) => Abi | undefined;
 }
@@ -186,6 +187,7 @@ export async function deployContract({
   constructorArguments,
   constructorName,
   limits,
+  skipDryRunning,
   modifyExtrinsic,
   lookupAbi,
 }: DeployContractOptions): Promise<DeployContractResult> {
@@ -196,6 +198,7 @@ export async function deployContract({
     constructorName,
     limits,
     signer,
+    skipDryRunning,
     modifyExtrinsic,
   });
 
