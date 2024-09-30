@@ -6,7 +6,11 @@ export function extractDispatchErrorDescription(dispatchError: DispatchError): s
       const module = dispatchError.asModule;
       const error = dispatchError.registry.findMetaError(module);
 
-      return `${error.section}.${error.name}: ${error.docs[0]}` ?? `${error.section}.${error.name}`;
+      if (error.docs.length === 0) {
+        return `${error.section}.${error.name}`;
+      } else {
+        return `${error.section}.${error.name}: ${error.docs[0]}`;
+      }
     } catch {}
   }
 
