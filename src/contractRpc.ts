@@ -71,7 +71,11 @@ function extractContractExecutionOutput(
   returnType: TypeDef | null | undefined
 ): QueryContractOutput {
   const data = result.data.toU8a(true);
-  if (!result.flags.isRevert) {
+
+  const contractReturnFlags = (result.flags as any).bits?.toNumber() ?? 0;
+  const didRevert = result.flags.isRevert || (contractReturnFlags & 0x01) === 0x01;
+
+  if (!didRevert) {
     const value = returnType
       ? abi.registry.createTypeUnsafe(returnType.lookupName || returnType.type, [data], {
           isPedantic: true,
