@@ -71,7 +71,17 @@ function extractContractExecutionOutput(
   returnType: TypeDef | null | undefined
 ): QueryContractOutput {
   const data = result.data.toU8a(true);
-  if (!result.flags.isRevert) {
+
+  // There is a breaking change between @polkadot/api 13.1.1 and 13.2.1
+  // in how a value of `ContractReturnFlags` (the TypeScript type for `result.flags`)
+  // is represented.
+  // Here we handle both representations as it is to be exepcted that a later version
+  // of polkadot-js will revert this breaking change.
+  // see https://github.com/polkadot-js/api/issues/5993
+  const contractReturnFlags = (result.flags as any).bits?.toNumber() ?? 0;
+  const didRevert = result.flags.isRevert || (contractReturnFlags & 0x01) === 0x01;
+
+  if (!didRevert) {
     const value = returnType
       ? abi.registry.createTypeUnsafe(returnType.lookupName || returnType.type, [data], {
           isPedantic: true,
